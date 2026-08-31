@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Paw&Book Owner Console"
+description = "A warm, operations-focused owner console for running pet care services across scheduling, jobs, customers, retail, staff, services, and reporting."
+version = "1.0.0"
+id = "artifacts/paw-and-book"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21446
+
+[services.development]
+run = "pnpm --filter @workspace/paw-and-book run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/paw-and-book", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/paw-and-book/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21446"
+BASE_PATH = "/"
