@@ -1,0 +1,423 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: dashboard
+    description: Owner cockpit summaries and actions
+  - name: calendar
+    description: Scheduled appointments
+  - name: jobs
+    description: Operational jobs
+  - name: customers
+    description: Owners and pets
+  - name: retail
+    description: Inventory and purchase orders
+  - name: staff
+    description: Staff performance
+  - name: services
+    description: Service catalog
+  - name: reports
+    description: Business reports
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get the owner cockpit
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /attention/{id}/complete:
+    patch:
+      operationId: completeAttention
+      tags: [dashboard]
+      summary: Complete an attention item
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Updated dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /calendar:
+    get:
+      operationId: getCalendar
+      tags: [calendar]
+      summary: List calendar appointments
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - name: service
+          in: query
+          schema:
+            type: string
+            default: all
+      responses:
+        "200":
+          description: Calendar appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+  /jobs:
+    get:
+      operationId: getJobs
+      tags: [jobs]
+      summary: List operational jobs
+      parameters:
+        - name: service
+          in: query
+          schema:
+            type: string
+            default: walks
+      responses:
+        "200":
+          description: Jobs grouped by status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobsBoard"
+  /jobs/{id}/status:
+    patch:
+      operationId: updateJobStatus
+      tags: [jobs]
+      summary: Update a job status
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobStatusInput"
+      responses:
+        "200":
+          description: Updated job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+  /customers:
+    get:
+      operationId: getCustomers
+      tags: [customers]
+      summary: List customers
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - name: segment
+          in: query
+          schema:
+            type: string
+            default: all
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+  /retail/inventory:
+    get:
+      operationId: getInventory
+      tags: [retail]
+      summary: List retail inventory
+      responses:
+        "200":
+          description: Inventory list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryItem"
+  /retail/purchase-orders:
+    post:
+      operationId: createPurchaseOrder
+      tags: [retail]
+      summary: Create a purchase order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseOrderInput"
+      responses:
+        "201":
+          description: Purchase order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+  /staff:
+    get:
+      operationId: getStaff
+      tags: [staff]
+      summary: List staff
+      responses:
+        "200":
+          description: Staff list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+  /services:
+    get:
+      operationId: getServices
+      tags: [services]
+      summary: List services
+      responses:
+        "200":
+          description: Service catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Service"
+  /reports:
+    get:
+      operationId: getReports
+      tags: [reports]
+      summary: Get business reports
+      responses:
+        "200":
+          description: Report data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reports"
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+        default: ""
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Kpi:
+      type: object
+      required: [label, value, detail, tone]
+      properties:
+        label: { type: string }
+        value: { type: string }
+        detail: { type: string }
+        tone:
+          type: string
+          enum: [up, down, flat]
+    TimelineBlock:
+      type: object
+      required: [id, label, type, start, end, live]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        type:
+          type: string
+          enum: [walk, groom, board, retail]
+        start: { type: number }
+        end: { type: number }
+        live: { type: boolean }
+    AttentionItem:
+      type: object
+      required: [id, title, meta, action, tone]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        meta: { type: string }
+        action: { type: string }
+        tone:
+          type: string
+          enum: [brick, amber, pine, retail, sage]
+    RevenueBar:
+      type: object
+      required: [label, value, peak]
+      properties:
+        label: { type: string }
+        value: { type: number }
+        peak: { type: boolean }
+    Utilization:
+      type: object
+      required: [label, value, display]
+      properties:
+        label: { type: string }
+        value: { type: number }
+        display: { type: string }
+    Dashboard:
+      type: object
+      required: [kpis, timeline, attention, revenue, utilization]
+      properties:
+        kpis:
+          type: array
+          items: { $ref: "#/components/schemas/Kpi" }
+        timeline:
+          type: array
+          items: { $ref: "#/components/schemas/TimelineBlock" }
+        attention:
+          type: array
+          items: { $ref: "#/components/schemas/AttentionItem" }
+        revenue:
+          type: array
+          items: { $ref: "#/components/schemas/RevenueBar" }
+        utilization:
+          type: array
+          items: { $ref: "#/components/schemas/Utilization" }
+    Appointment:
+      type: object
+      required: [id, day, time, pet, service, staff, type]
+      properties:
+        id: { type: string }
+        day: { type: string }
+        time: { type: string }
+        pet: { type: string }
+        service: { type: string }
+        staff: { type: string }
+        type:
+          type: string
+          enum: [walk, groom, board, retail]
+    Job:
+      type: object
+      required: [id, pet, time, detail, staff, status, issue]
+      properties:
+        id: { type: string }
+        pet: { type: string }
+        time: { type: string }
+        detail: { type: string }
+        staff: { type: string }
+        status:
+          type: string
+          enum: [scheduled, in_progress, completed, issues]
+        issue: { type: boolean }
+    JobsBoard:
+      type: object
+      required: [scheduled, inProgress, completed, issues]
+      properties:
+        scheduled:
+          type: array
+          items: { $ref: "#/components/schemas/Job" }
+        inProgress:
+          type: array
+          items: { $ref: "#/components/schemas/Job" }
+        completed:
+          type: array
+          items: { $ref: "#/components/schemas/Job" }
+        issues:
+          type: array
+          items: { $ref: "#/components/schemas/Job" }
+    JobStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [scheduled, in_progress, completed, issues]
+    Customer:
+      type: object
+      required: [id, initials, name, pet, detail, lifetimeValue, segment]
+      properties:
+        id: { type: string }
+        initials: { type: string }
+        name: { type: string }
+        pet: { type: string }
+        detail: { type: string }
+        lifetimeValue: { type: string }
+        segment: { type: string }
+    InventoryItem:
+      type: object
+      required: [sku, item, stock, reorderAt, category, salesShare]
+      properties:
+        sku: { type: string }
+        item: { type: string }
+        stock: { type: number }
+        reorderAt: { type: number }
+        category: { type: string }
+        salesShare: { type: number }
+    PurchaseOrderInput:
+      type: object
+      required: [sku, quantity]
+      properties:
+        sku: { type: string }
+        quantity: { type: number, minimum: 1 }
+    PurchaseOrder:
+      type: object
+      required: [id, sku, quantity, status]
+      properties:
+        id: { type: string }
+        sku: { type: string }
+        quantity: { type: number }
+        status: { type: string }
+    StaffMember:
+      type: object
+      required: [id, initials, name, role, jobs, rating, incidents]
+      properties:
+        id: { type: string }
+        initials: { type: string }
+        name: { type: string }
+        role: { type: string }
+        jobs: { type: number }
+        rating: { type: number }
+        incidents: { type: number }
+    Service:
+      type: object
+      required: [id, name, detail, price, modifier]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        detail: { type: string }
+        price: { type: string }
+        modifier: { type: string }
+    Reports:
+      type: object
+      required: [revenueByService, quality]
+      properties:
+        revenueByService:
+          type: array
+          items: { $ref: "#/components/schemas/RevenueBar" }
+        quality:
+          type: array
+          items: { $ref: "#/components/schemas/Utilization" }
+
