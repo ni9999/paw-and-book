@@ -1,276 +1,449 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { Router, type IRouter } from "express";
-import {
-  CompleteAttentionParams,
-  CreatePurchaseOrderBody,
-  CreatePurchaseOrderResponse,
-  GetCalendarQueryParams,
-  GetCalendarResponse,
-  GetCustomersQueryParams,
-  GetCustomersResponse,
-  GetDashboardResponse,
-  GetInventoryResponse,
-  GetJobsQueryParams,
-  GetJobsResponse,
-  GetReportsResponse,
-  GetServicesResponse,
-  GetStaffResponse,
-  UpdateJobStatusBody,
-  UpdateJobStatusParams,
-  UpdateJobStatusResponse,
-} from "@workspace/api-zod";
 
-type AttentionTone = "brick" | "amber" | "pine" | "retail" | "sage";
-type JobStatus = "scheduled" | "in_progress" | "completed" | "issues";
-type JobKind = "walks" | "grooming" | "boarding";
+type Branch = {
+  id: string;
+  name: string;
+  timezone: string;
+  currency: string;
+};
+
+type Pet = {
+  id: string;
+  name: string;
+  species: string;
+  breed: string;
+  vaccinationExpiry: string;
+};
+
+type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  tag: string;
+  pets: Pet[];
+};
+
+type StaffMember = {
+  id: string;
+  name: string;
+  role: string;
+  status: string;
+  rating: number;
+  jobsToday: number;
+};
+
+type Service = {
+  id: string;
+  name: string;
+  category: string;
+  durationMinutes: number;
+  price: number;
+  active: boolean;
+};
 
 type Job = {
   id: string;
-  pet: string;
-  time: string;
-  detail: string;
-  staff: string;
-  status: JobStatus;
-  issue: boolean;
-  kind: JobKind;
+  petId: string;
+  petName: string;
+  ownerName: string;
+  serviceId: string;
+  service: string;
+  category: string;
+  staffId: string | null;
+  staffName: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: "Scheduled" | "In progress" | "Completed" | "Issues";
+  location: string;
+  gps?: { status: string; lastPing: string };
 };
 
-const kpis = [
-  { label: "Revenue", value: "$2,140", detail: "12% vs last Tue", tone: "up" as const },
-  { label: "Appointments", value: "27", detail: "86% of capacity", tone: "flat" as const },
-  { label: "No-shows", value: "1", detail: "vs 0 last week", tone: "down" as const },
-  { label: "Retail sales", value: "$380", detail: "8% increase", tone: "up" as const },
-  { label: "Avg rating", value: "4.8", detail: "last 7 days", tone: "flat" as const },
-  { label: "Open incidents", value: "1", detail: "needs review", tone: "down" as const },
-];
-
-const timeline = [
-  { id: "tl-milo", label: "Milo · walk", type: "walk" as const, start: 4, end: 13, live: true },
-  { id: "tl-coco", label: "Coco · groom", type: "groom" as const, start: 16, end: 23, live: false },
-  { id: "tl-dropoff", label: "Boarding drop-off", type: "board" as const, start: 26, end: 40, live: false },
-  { id: "tl-duke", label: "Duke · walk", type: "walk" as const, start: 44, end: 52, live: true },
-  { id: "tl-bella", label: "Bella · groom", type: "groom" as const, start: 55, end: 65, live: false },
-  { id: "tl-restock", label: "Restock", type: "retail" as const, start: 68, end: 74, live: false },
-  { id: "tl-rocky", label: "Rocky · sit", type: "walk" as const, start: 78, end: 87, live: false },
-  { id: "tl-pickups", label: "Pick-ups", type: "board" as const, start: 90, end: 98, live: false },
-];
-
-const attention: Array<{
+type InventoryItem = {
   id: string;
-  title: string;
-  meta: string;
-  action: string;
-  tone: AttentionTone;
-}> = [
-  { id: "gps-jasper", title: "Walk with Jasper — no GPS ping for 22 min", meta: "Started 10:40 · walker: Tomás", action: "Message walker", tone: "brick" },
-  { id: "booking-requests", title: "3 booking requests awaiting approval", meta: "Oldest: 41 min ago", action: "Review", tone: "amber" },
-  { id: "grooming-assignment", title: "Grooming table 2 has no staff assigned, 2–4pm", meta: "Booked: Bella, Otis", action: "Assign staff", tone: "pine" },
-  { id: "retail-reorder", title: "Salmon treats & medium leashes below reorder point", meta: "2 SKUs critical", action: "Create PO", tone: "retail" },
-  { id: "rocky-vaccine", title: "Rocky's vaccination expires in 5 days", meta: "Owner: J. Patel", action: "Message owner", tone: "sage" },
-];
-
-const revenue = [
-  { label: "W1", value: 40, peak: false },
-  { label: "W2", value: 55, peak: false },
-  { label: "W3", value: 80, peak: true },
-  { label: "W4", value: 62, peak: false },
-  { label: "W5", value: 70, peak: false },
-  { label: "W6", value: 48, peak: false },
-  { label: "W7", value: 58, peak: false },
-];
-
-const utilization = [
-  { label: "Kennels", value: 74, display: "74%" },
-  { label: "Grooming tables", value: 58, display: "58%" },
-  { label: "Walker slots", value: 91, display: "91%" },
-];
-
-const appointments = [
-  { id: "apt-milo-mon", day: "Mon 9", time: "9:00", pet: "Milo", service: "Walk", staff: "Tomás", type: "walk" as const },
-  { id: "apt-coco-tue", day: "Tue 10", time: "9:00", pet: "Coco", service: "Bath + trim", staff: "Ana", type: "groom" as const },
-  { id: "apt-otis-thu", day: "Thu 12", time: "9:00", pet: "Otis", service: "Boarding · in", staff: "Front desk", type: "board" as const },
-  { id: "apt-bella-mon", day: "Mon 9", time: "11:00", pet: "Bella", service: "Full groom", staff: "Ana", type: "groom" as const },
-  { id: "apt-group-tue", day: "Tue 10", time: "11:00", pet: "Group", service: "Boarding drop-off", staff: "Front desk", type: "board" as const },
-  { id: "apt-duke-wed", day: "Wed 11", time: "11:00", pet: "Duke", service: "Walk", staff: "Sam", type: "walk" as const },
-  { id: "apt-store-fri", day: "Fri 13", time: "11:00", pet: "Store", service: "Vendor delivery", staff: "Rina", type: "retail" as const },
-  { id: "apt-rocky-tue", day: "Tue 10", time: "1:00 pm", pet: "Rocky", service: "Sit visit", staff: "Tomás", type: "walk" as const },
-  { id: "apt-nala-wed", day: "Wed 11", time: "1:00 pm", pet: "Nala", service: "Nail trim", staff: "Ana", type: "groom" as const },
-  { id: "apt-otis-fri", day: "Fri 13", time: "1:00 pm", pet: "Otis", service: "Boarding · out", staff: "Front desk", type: "board" as const },
-  { id: "apt-zeus-mon", day: "Mon 9", time: "3:00 pm", pet: "Zeus", service: "Full groom", staff: "Ana", type: "groom" as const },
-  { id: "apt-milo-wed", day: "Wed 11", time: "3:00 pm", pet: "Milo", service: "Walk", staff: "Sam", type: "walk" as const },
-  { id: "apt-coco-thu", day: "Thu 12", time: "3:00 pm", pet: "Coco", service: "Bath", staff: "Ana", type: "groom" as const },
-];
-
-const jobs: Job[] = [
-  { id: "job-rocky", pet: "Rocky", time: "1:00p", detail: "Sitting visit", staff: "Tomás", status: "scheduled", issue: false, kind: "walks" },
-  { id: "job-milo-315", pet: "Milo", time: "3:15p", detail: "Walk", staff: "Sam", status: "scheduled", issue: false, kind: "walks" },
-  { id: "job-nina", pet: "Nina", time: "4:00p", detail: "Walk · meds", staff: "Tomás", status: "scheduled", issue: false, kind: "walks" },
-  { id: "job-fig", pet: "Fig", time: "4:30p", detail: "Group walk", staff: "Sam", status: "scheduled", issue: false, kind: "walks" },
-  { id: "job-duke", pet: "Duke", time: "since 11:50a", detail: "GPS live", staff: "Sam", status: "in_progress", issue: false, kind: "walks" },
-  { id: "job-milo-905", pet: "Milo", time: "since 9:05a", detail: "GPS live", staff: "Tomás", status: "in_progress", issue: false, kind: "walks" },
-  { id: "job-coco", pet: "Coco", time: "9:40a", detail: "Walk", staff: "Ana", status: "completed", issue: false, kind: "walks" },
-  { id: "job-otis", pet: "Otis", time: "10:10a", detail: "Walk", staff: "Sam", status: "completed", issue: false, kind: "walks" },
-  { id: "job-bella", pet: "Bella", time: "10:55a", detail: "Walk", staff: "Tomás", status: "completed", issue: false, kind: "walks" },
-  { id: "job-jasper", pet: "Jasper", time: "10:40a", detail: "No GPS ping · 22 min", staff: "Tomás", status: "issues", issue: true, kind: "walks" },
-  { id: "job-nala-groom", pet: "Nala", time: "2:00p", detail: "Nail trim", staff: "Ana", status: "scheduled", issue: false, kind: "grooming" },
-  { id: "job-otis-board", pet: "Otis", time: "overnight", detail: "Boarding", staff: "Front desk", status: "in_progress", issue: false, kind: "boarding" },
-];
-
-const customers = [
-  { id: "customer-patel", initials: "JP", name: "J. Patel", pet: "Rocky (Labrador)", detail: "last visit 3 days ago", lifetimeValue: "$2,410", segment: "vip" },
-  { id: "customer-santos", initials: "MS", name: "M. Santos", pet: "Duke (Boxer)", detail: "last visit today", lifetimeValue: "$860", segment: "all" },
-  { id: "customer-khan", initials: "AK", name: "A. Khan", pet: "Nina (Poodle)", detail: "last visit 19 days ago", lifetimeValue: "$310", segment: "at-risk" },
-  { id: "customer-reyes", initials: "LR", name: "L. Reyes", pet: "Bella (Shih Tzu)", detail: "last visit today", lifetimeValue: "$1,120", segment: "new" },
-];
-
-const inventory = [
-  { sku: "SL-204", item: "Salmon treats, 400g", stock: 3, reorderAt: 15, category: "Treats", salesShare: 36 },
-  { sku: "LM-118", item: "Medium leash, teal", stock: 2, reorderAt: 10, category: "Toys", salesShare: 19 },
-  { sku: "SH-045", item: "Oatmeal shampoo, 1L", stock: 12, reorderAt: 10, category: "Grooming care", salesShare: 17 },
-];
-
-const staff = [
-  { id: "staff-tomas", initials: "TR", name: "Tomás R.", role: "Walker · Sitter", jobs: 18, rating: 4.9, incidents: 0 },
-  { id: "staff-ana", initials: "AG", name: "Ana G.", role: "Groomer", jobs: 14, rating: 4.8, incidents: 0 },
-  { id: "staff-sam", initials: "SO", name: "Sam O.", role: "Walker", jobs: 11, rating: 4.6, incidents: 1 },
-];
-
-const services = [
-  { id: "service-walk", name: "Standard walk (30 min)", detail: "Walks · max 3 dogs/slot", price: "$22.00", modifier: "" },
-  { id: "service-groom", name: "Full groom + bath", detail: "Grooming · 90 min · requires vaccination record", price: "$68.00", modifier: "" },
-  { id: "service-board", name: "Overnight boarding", detail: "Boarding · per night · kennel required", price: "$45.00", modifier: "" },
-  { id: "service-nail", name: "Nail trim", detail: "Grooming add-on · 10 min", price: "$12.00", modifier: "" },
-];
-
-const reports = {
-  revenueByService: [
-    { label: "Walk", value: 60, peak: false },
-    { label: "Groom", value: 85, peak: true },
-    { label: "Board", value: 70, peak: false },
-    { label: "Retail", value: 35, peak: false },
-  ],
-  quality: [
-    { label: "Avg rating", value: 96, display: "4.8" },
-    { label: "No-show rate", value: 6, display: "2%" },
-    { label: "Incidents /100", value: 9, display: "1.4" },
-  ],
+  name: string;
+  category: string;
+  sku: string;
+  stock: number;
+  reorderPoint: number;
+  unitPrice: number;
 };
+
+type Sale = {
+  id: string;
+  date: string;
+  category: string;
+  amount: number;
+};
+
+type Database = {
+  branch: Branch;
+  users: Array<{ id: string; name: string; role: string; email: string }>;
+  customers: Customer[];
+  staff: StaffMember[];
+  services: Service[];
+  jobs: Job[];
+  inventory: InventoryItem[];
+  sales: Sale[];
+  appointments: Array<Record<string, string>>;
+  incidents: Array<Record<string, string>>;
+  bookingRequests: Array<Record<string, string>>;
+  audit: Array<{
+    id: string;
+    action: string;
+    entity: string;
+    entityId: string;
+    details: Record<string, unknown>;
+    actor: string;
+    createdAt: string;
+  }>;
+};
+
+const DB_FILE = path.resolve(process.cwd(), "data/db.json");
+
+function loadDb(): Database {
+  return JSON.parse(fs.readFileSync(DB_FILE, "utf8")) as Database;
+}
+
+function saveDb(db: Database): void {
+  fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+  fs.writeFileSync(DB_FILE, `${JSON.stringify(db, null, 2)}\n`, "utf8");
+}
+
+function ok<T>(res: Parameters<IRouter["get"]>[1] extends never ? never : any, data: T, status = 200) {
+  return res.status(status).json({ success: true, data });
+}
+
+function fail(res: any, message: string, status = 400) {
+  return res.status(status).json({ success: false, error: message });
+}
+
+function audit(
+  db: Database,
+  action: string,
+  entity: string,
+  entityId: string,
+  details: Record<string, unknown> = {},
+): void {
+  db.audit.push({
+    id: randomUUID(),
+    action,
+    entity,
+    entityId,
+    details,
+    actor: "user_owner_1",
+    createdAt: new Date().toISOString(),
+  });
+}
+
+function queryValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function matchesCategory(job: Job, value: string): boolean {
+  const normalized = value.toLowerCase();
+  if (!normalized || normalized === "all" || normalized === "walks") return true;
+  const aliases: Record<string, string> = {
+    walk: "walking",
+    walks: "walking",
+    groom: "grooming",
+    grooming: "grooming",
+    board: "boarding",
+    boarding: "boarding",
+    retail: "retail",
+  };
+  return job.category.toLowerCase() === (aliases[normalized] ?? normalized);
+}
+
+function buildDashboard(db: Database) {
+  const today = "2026-09-03";
+  const todayJobs = db.jobs.filter((job) => job.date === today);
+  const lowStock = db.inventory.filter((item) => item.stock <= item.reorderPoint);
+  const openIncidents = db.incidents.filter((incident) => incident.status === "open");
+  const pendingBookings = db.bookingRequests.filter((request) => request.status === "awaiting_approval");
+  const retailSales = db.sales.reduce((total, sale) => total + sale.amount, 0);
+
+  return {
+    branch: db.branch,
+    date: today,
+    kpis: {
+      revenue: 2140,
+      appointments: 27,
+      noShows: 1,
+      retailSales,
+      averageRating: 4.8,
+      openIncidents: openIncidents.length,
+    },
+    timeline: todayJobs,
+    needsAttention: {
+      gpsIssues: openIncidents,
+      bookingRequests: pendingBookings,
+      unassignedJobs: todayJobs.filter((job) => !job.staffId),
+      lowStock,
+      vaccinationAlerts: [
+        { petName: "Rocky", ownerName: "J. Patel", expires: "2026-10-15" },
+      ],
+    },
+    utilization: { kennels: 74, groomingTables: 58, walkerSlots: 91 },
+    topStaff: db.staff.slice().sort((a, b) => b.rating - a.rating),
+    revenueByService: [
+      { service: "Walking", revenue: 860 },
+      { service: "Grooming", revenue: 620 },
+      { service: "Boarding", revenue: 480 },
+      { service: "Retail", revenue: 380 },
+    ],
+  };
+}
 
 const router: IRouter = Router();
 
-const getDashboard = () => GetDashboardResponse.parse({ kpis, timeline, attention, revenue, utilization });
+router.get("/health", (_req, res) => {
+  ok(res, {
+    status: "healthy",
+    service: "pawnets-backend",
+    time: new Date().toISOString(),
+  });
+});
+
+router.get("/branch", (_req, res) => {
+  ok(res, loadDb().branch);
+});
+
+router.get("/me", (_req, res) => {
+  ok(res, loadDb().users[0]);
+});
 
 router.get("/dashboard", (_req, res) => {
-  res.json(getDashboard());
+  ok(res, buildDashboard(loadDb()));
 });
 
 router.patch("/attention/:id/complete", (req, res) => {
-  const params = CompleteAttentionParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: "Invalid attention item" });
-    return;
-  }
-  const index = attention.findIndex((item) => item.id === params.data.id);
-  if (index === -1) {
-    res.status(404).json({ error: "Attention item not found" });
-    return;
-  }
-  attention.splice(index, 1);
-  res.json(getDashboard());
+  const db = loadDb();
+  const index = db.incidents.findIndex((item) => item.id === req.params.id);
+  if (index === -1) return fail(res, "Attention item not found", 404);
+  db.incidents.splice(index, 1);
+  audit(db, "attention.completed", "incident", req.params.id);
+  saveDb(db);
+  return ok(res, buildDashboard(db));
 });
 
 router.get("/calendar", (req, res) => {
-  const params = GetCalendarQueryParams.safeParse(req.query);
-  if (!params.success) {
-    res.status(400).json({ error: "Invalid calendar filters" });
-    return;
-  }
-  const search = params.data.search.toLowerCase();
-  const service = params.data.service.toLowerCase();
-  const filtered = appointments.filter((appointment) => {
-    const matchesSearch = !search || [appointment.pet, appointment.staff, appointment.service].some((value) => value.toLowerCase().includes(search));
-    const matchesService = service === "all" || appointment.type === service.replace("ing", "").replace("s", "") || appointment.service.toLowerCase().includes(service.replace("ing", ""));
-    return matchesSearch && matchesService;
+  const db = loadDb();
+  const search = queryValue(req.query.q || req.query.search).toLowerCase();
+  const service = queryValue(req.query.service).toLowerCase();
+  const jobs = db.jobs.filter((job) => {
+    const matchesSearch =
+      !search ||
+      [job.petName, job.ownerName, job.service, job.staffName]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(search));
+    return matchesSearch && matchesCategory(job, service);
   });
-  res.json(GetCalendarResponse.parse(filtered));
+  return ok(res, jobs);
 });
 
-const getJobs = (kind: JobKind = "walks") => {
-  const visible = jobs.filter((job) => job.kind === kind);
-  return GetJobsResponse.parse({
-    scheduled: visible.filter((job) => job.status === "scheduled"),
-    inProgress: visible.filter((job) => job.status === "in_progress"),
-    completed: visible.filter((job) => job.status === "completed"),
-    issues: visible.filter((job) => job.status === "issues"),
-  });
-};
+router.patch("/calendar/:jobId", (req, res) => {
+  const db = loadDb();
+  const job = db.jobs.find((item) => item.id === req.params.jobId);
+  if (!job) return fail(res, "Job not found", 404);
+
+  const { date, startTime, endTime, staffId } = req.body as Record<string, unknown>;
+  if (date !== undefined) job.date = String(date);
+  if (startTime !== undefined) job.startTime = String(startTime);
+  if (endTime !== undefined) job.endTime = String(endTime);
+  if (staffId !== undefined) {
+    job.staffId = staffId === null || staffId === "" ? null : String(staffId);
+    const staff = db.staff.find((member) => member.id === job.staffId);
+    job.staffName = staff?.name ?? null;
+  }
+
+  audit(db, "calendar.update", "job", job.id, { date: job.date, startTime: job.startTime, endTime: job.endTime, staffId: job.staffId });
+  saveDb(db);
+  return ok(res, job);
+});
 
 router.get("/jobs", (req, res) => {
-  const params = GetJobsQueryParams.safeParse(req.query);
-  if (!params.success) {
-    res.status(400).json({ error: "Invalid jobs filter" });
-    return;
-  }
-  const kind = params.data.service === "grooming" || params.data.service === "boarding" ? params.data.service : "walks";
-  res.json(getJobs(kind));
+  const db = loadDb();
+  const status = queryValue(req.query.status).toLowerCase();
+  const category = queryValue(req.query.category || req.query.service);
+  const jobs = db.jobs.filter((job) => {
+    const statusMatches = !status || job.status.toLowerCase() === status;
+    return statusMatches && matchesCategory(job, category);
+  });
+  return ok(res, jobs);
 });
 
 router.patch("/jobs/:id/status", (req, res) => {
-  const params = UpdateJobStatusParams.safeParse(req.params);
-  const body = UpdateJobStatusBody.safeParse(req.body);
-  if (!params.success || !body.success) {
-    res.status(400).json({ error: "Invalid job update" });
-    return;
-  }
-  const job = jobs.find((item) => item.id === params.data.id);
-  if (!job) {
-    res.status(404).json({ error: "Job not found" });
-    return;
-  }
-  job.status = body.data.status as JobStatus;
-  job.issue = job.status === "issues";
-  res.json(UpdateJobStatusResponse.parse(job));
+  const db = loadDb();
+  const job = db.jobs.find((item) => item.id === req.params.id);
+  if (!job) return fail(res, "Job not found", 404);
+  const nextStatus = req.body?.status;
+  const allowed = ["Scheduled", "In progress", "Completed", "Issues", "scheduled", "in_progress", "completed", "issues"];
+  if (!allowed.includes(nextStatus)) return fail(res, "Invalid status");
+
+  const statusMap: Record<string, Job["status"]> = {
+    scheduled: "Scheduled",
+    in_progress: "In progress",
+    completed: "Completed",
+    issues: "Issues",
+  };
+  const normalized = statusMap[String(nextStatus)] ?? (nextStatus as Job["status"]);
+  const previousStatus = job.status;
+  job.status = normalized;
+  audit(db, "job.status_changed", "job", job.id, { from: previousStatus, to: normalized });
+  saveDb(db);
+  return ok(res, job);
 });
 
 router.get("/customers", (req, res) => {
-  const params = GetCustomersQueryParams.safeParse(req.query);
-  if (!params.success) {
-    res.status(400).json({ error: "Invalid customer filters" });
-    return;
-  }
-  const search = params.data.search.toLowerCase();
-  const segment = params.data.segment;
-  const filtered = customers.filter((customer) => {
-    const matchesSearch = !search || [customer.name, customer.pet, customer.lifetimeValue].some((value) => value.toLowerCase().includes(search));
-    const matchesSegment = segment === "all" || customer.segment === segment;
-    return matchesSearch && matchesSegment;
+  const db = loadDb();
+  const search = queryValue(req.query.q || req.query.search).toLowerCase();
+  const tag = queryValue(req.query.tag || req.query.segment).toLowerCase();
+  const customers = db.customers.filter((customer) => {
+    const values = [customer.name, customer.phone, customer.email, customer.tag, ...customer.pets.map((pet) => pet.name)];
+    const searchMatches = !search || values.some((value) => value.toLowerCase().includes(search));
+    const tagMatches = !tag || tag === "all" || customer.tag.toLowerCase() === tag;
+    return searchMatches && tagMatches;
   });
-  res.json(GetCustomersResponse.parse(filtered));
+  return ok(res, customers);
 });
 
-router.get("/retail/inventory", (_req, res) => {
-  res.json(GetInventoryResponse.parse(inventory));
-});
-
-router.post("/retail/purchase-orders", (req, res) => {
-  const body = CreatePurchaseOrderBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: "Invalid purchase order" });
-    return;
-  }
-  const order = { id: `po-${Date.now()}`, sku: body.data.sku, quantity: body.data.quantity, status: "Draft" };
-  res.status(201).json(CreatePurchaseOrderResponse.parse(order));
+router.get("/customers/:id", (req, res) => {
+  const db = loadDb();
+  const customer = db.customers.find((item) => item.id === req.params.id);
+  if (!customer) return fail(res, "Customer not found", 404);
+  const petIds = new Set(customer.pets.map((pet) => pet.id));
+  return ok(res, { customer, jobs: db.jobs.filter((job) => petIds.has(job.petId)) });
 });
 
 router.get("/staff", (_req, res) => {
-  res.json(GetStaffResponse.parse(staff));
+  ok(res, loadDb().staff);
+});
+
+router.patch("/staff/:id", (req, res) => {
+  const db = loadDb();
+  const staff = db.staff.find((member) => member.id === req.params.id);
+  if (!staff) return fail(res, "Staff member not found", 404);
+  const { status, role, rating } = req.body as Record<string, unknown>;
+  if (status !== undefined) staff.status = String(status);
+  if (role !== undefined) staff.role = String(role);
+  if (rating !== undefined && Number.isFinite(Number(rating))) staff.rating = Number(rating);
+  audit(db, "staff.updated", "staff", staff.id, { status: staff.status, role: staff.role, rating: staff.rating });
+  saveDb(db);
+  return ok(res, staff);
 });
 
 router.get("/services", (_req, res) => {
-  res.json(GetServicesResponse.parse(services));
+  ok(res, loadDb().services);
 });
 
-router.get("/reports", (_req, res) => {
-  res.json(GetReportsResponse.parse(reports));
+router.post("/services", (req, res) => {
+  const db = loadDb();
+  const { name, category, durationMinutes, price } = req.body as Record<string, unknown>;
+  if (!name || !category || price === undefined || !Number.isFinite(Number(price))) {
+    return fail(res, "name, category and price are required");
+  }
+  const service: Service = {
+    id: randomUUID(),
+    name: String(name),
+    category: String(category),
+    durationMinutes: Number(durationMinutes ?? 30),
+    price: Number(price),
+    active: true,
+  };
+  db.services.push(service);
+  audit(db, "service.created", "service", service.id, service);
+  saveDb(db);
+  return ok(res, service, 201);
+});
+
+router.patch("/services/:id", (req, res) => {
+  const db = loadDb();
+  const service = db.services.find((item) => item.id === req.params.id);
+  if (!service) return fail(res, "Service not found", 404);
+  const { name, category, durationMinutes, price, active } = req.body as Record<string, unknown>;
+  if (name !== undefined) service.name = String(name);
+  if (category !== undefined) service.category = String(category);
+  if (durationMinutes !== undefined) service.durationMinutes = Number(durationMinutes);
+  if (price !== undefined) service.price = Number(price);
+  if (active !== undefined) service.active = Boolean(active);
+  audit(db, "service.updated", "service", service.id, service);
+  saveDb(db);
+  return ok(res, service);
+});
+
+router.get("/inventory", (req, res) => {
+  const db = loadDb();
+  const items = req.query.lowStock === "true" ? db.inventory.filter((item) => item.stock <= item.reorderPoint) : db.inventory;
+  return ok(res, items);
+});
+
+router.post("/inventory/:id/purchase-order", (req, res) => {
+  const db = loadDb();
+  const item = db.inventory.find((inventoryItem) => inventoryItem.id === req.params.id);
+  if (!item) return fail(res, "Inventory item not found", 404);
+  const quantity = Number(req.body?.quantity ?? 1);
+  if (!Number.isFinite(quantity) || quantity <= 0) return fail(res, "Quantity must be greater than zero");
+  const purchaseOrder = {
+    id: randomUUID(),
+    inventoryId: item.id,
+    itemName: item.name,
+    quantity,
+    status: "draft",
+    createdAt: new Date().toISOString(),
+  };
+  audit(db, "inventory.purchase_order_created", "inventory", item.id, purchaseOrder);
+  saveDb(db);
+  return ok(res, purchaseOrder, 201);
+});
+
+router.get("/reports", (req, res) => {
+  const db = loadDb();
+  const range = queryValue(req.query.range) || "30d";
+  const retail = db.sales.reduce((sum, sale) => sum + sale.amount, 0);
+  const revenueByCategory: Record<string, number> = {};
+  for (const sale of db.sales) revenueByCategory[sale.category] = (revenueByCategory[sale.category] ?? 0) + sale.amount;
+  return ok(res, {
+    range,
+    revenue: { total: 2140 + retail, services: 2140, retail },
+    appointments: { total: 27, completed: 23, cancelled: 2, noShows: 1, pending: 1 },
+    revenueByCategory,
+    utilization: { kennels: 74, groomingTables: 58, walkerSlots: 91 },
+  });
+});
+
+router.get("/audit", (_req, res) => {
+  ok(res, loadDb().audit.slice().reverse());
+});
+
+// Compatibility aliases used by the existing React console.
+router.get("/retail/inventory", (req, res) => {
+  const db = loadDb();
+  const items = db.inventory.map((item) => ({
+    sku: item.sku,
+    item: item.name,
+    stock: item.stock,
+    reorderAt: item.reorderPoint,
+    category: item.category,
+    salesShare: 0,
+  }));
+  return ok(res, req.query.lowStock === "true" ? items.filter((item) => item.stock <= item.reorderAt) : items);
+});
+
+router.post("/retail/purchase-orders", (req, res) => {
+  const db = loadDb();
+  const item = db.inventory.find((inventoryItem) => inventoryItem.sku === req.body?.sku);
+  if (!item) return fail(res, "Inventory item not found", 404);
+  const quantity = Number(req.body?.quantity);
+  if (!Number.isFinite(quantity) || quantity < 1) return fail(res, "Quantity must be greater than zero");
+  const purchaseOrder = { id: randomUUID(), inventoryId: item.id, itemName: item.name, quantity, status: "Draft", createdAt: new Date().toISOString() };
+  audit(db, "inventory.purchase_order_created", "inventory", item.id, purchaseOrder);
+  saveDb(db);
+  return ok(res, purchaseOrder, 201);
 });
 
 export default router;

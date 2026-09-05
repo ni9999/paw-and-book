@@ -1,0 +1,323 @@
+{
+  "branch": {
+    "id": "branch_riverside",
+    "name": "Riverside",
+    "timezone": "America/Los_Angeles",
+    "currency": "USD"
+  },
+  "users": [
+    {
+      "id": "user_owner_1",
+      "name": "Rina K.",
+      "role": "owner",
+      "email": "rina@example.com"
+    }
+  ],
+  "customers": [
+    {
+      "id": "customer_001",
+      "name": "J. Patel",
+      "phone": "+1 555-0101",
+      "email": "jpatel@example.com",
+      "tag": "VIP",
+      "pets": [
+        {
+          "id": "pet_001",
+          "name": "Rocky",
+          "species": "dog",
+          "breed": "Golden Retriever",
+          "vaccinationExpiry": "2026-10-15"
+        }
+      ]
+    },
+    {
+      "id": "customer_002",
+      "name": "M. Santos",
+      "phone": "+1 555-0102",
+      "email": "msantos@example.com",
+      "tag": "At risk",
+      "pets": [
+        {
+          "id": "pet_002",
+          "name": "Milo",
+          "species": "dog",
+          "breed": "Beagle",
+          "vaccinationExpiry": "2027-01-12"
+        }
+      ]
+    },
+    {
+      "id": "customer_003",
+      "name": "A. Khan",
+      "phone": "+1 555-0103",
+      "email": "akhan@example.com",
+      "tag": "New",
+      "pets": [
+        {
+          "id": "pet_003",
+          "name": "Nina",
+          "species": "cat",
+          "breed": "Maine Coon",
+          "vaccinationExpiry": "2027-02-20"
+        }
+      ]
+    },
+    {
+      "id": "customer_004",
+      "name": "L. Reyes",
+      "phone": "+1 555-0104",
+      "email": "lreyes@example.com",
+      "tag": "VIP",
+      "pets": [
+        {
+          "id": "pet_004",
+          "name": "Fig",
+          "species": "dog",
+          "breed": "French Bulldog",
+          "vaccinationExpiry": "2027-04-02"
+        }
+      ]
+    }
+  ],
+  "staff": [
+    {
+      "id": "staff_001",
+      "name": "Tomás R.",
+      "role": "Walker",
+      "status": "Available",
+      "rating": 4.9,
+      "jobsToday": 8
+    },
+    {
+      "id": "staff_002",
+      "name": "Ana G.",
+      "role": "Groomer",
+      "status": "Busy",
+      "rating": 4.8,
+      "jobsToday": 6
+    },
+    {
+      "id": "staff_003",
+      "name": "Sam O.",
+      "role": "Pet Sitter",
+      "status": "Available",
+      "rating": 4.7,
+      "jobsToday": 7
+    }
+  ],
+  "services": [
+    {
+      "id": "service_walk",
+      "name": "Standard walk",
+      "category": "Walking",
+      "durationMinutes": 30,
+      "price": 22,
+      "active": true
+    },
+    {
+      "id": "service_groom",
+      "name": "Full groom",
+      "category": "Grooming",
+      "durationMinutes": 90,
+      "price": 68,
+      "active": true
+    },
+    {
+      "id": "service_boarding",
+      "name": "Overnight boarding",
+      "category": "Boarding",
+      "durationMinutes": 1440,
+      "price": 45,
+      "active": true
+    },
+    {
+      "id": "service_nails",
+      "name": "Nail trim",
+      "category": "Grooming",
+      "durationMinutes": 20,
+      "price": 12,
+      "active": true
+    }
+  ],
+  "jobs": [
+    {
+      "id": "job_001",
+      "petId": "pet_001",
+      "petName": "Rocky",
+      "ownerName": "J. Patel",
+      "serviceId": "service_walk",
+      "service": "Standard walk",
+      "category": "Walking",
+      "staffId": "staff_001",
+      "staffName": "Tomás R.",
+      "date": "2026-09-03",
+      "startTime": "09:00",
+      "endTime": "09:30",
+      "status": "Scheduled",
+      "location": "Riverside",
+      "gps": {
+        "status": "Issue",
+        "lastPing": "08:52"
+      }
+    },
+    {
+      "id": "job_002",
+      "petId": "pet_002",
+      "petName": "Milo",
+      "ownerName": "M. Santos",
+      "serviceId": "service_groom",
+      "service": "Full groom",
+      "category": "Grooming",
+      "staffId": "staff_002",
+      "staffName": "Ana G.",
+      "date": "2026-09-03",
+      "startTime": "10:00",
+      "endTime": "11:30",
+      "status": "In progress",
+      "location": "Riverside"
+    },
+    {
+      "id": "job_003",
+      "petId": "pet_003",
+      "petName": "Nina",
+      "ownerName": "A. Khan",
+      "serviceId": "service_boarding",
+      "service": "Overnight boarding",
+      "category": "Boarding",
+      "staffId": "staff_003",
+      "staffName": "Sam O.",
+      "date": "2026-09-03",
+      "startTime": "11:00",
+      "endTime": "11:30",
+      "status": "Scheduled",
+      "location": "Riverside"
+    },
+    {
+      "id": "job_004",
+      "petId": "pet_004",
+      "petName": "Fig",
+      "ownerName": "L. Reyes",
+      "serviceId": "service_nails",
+      "service": "Nail trim",
+      "category": "Grooming",
+      "staffId": null,
+      "staffName": null,
+      "date": "2026-09-03",
+      "startTime": "13:00",
+      "endTime": "13:20",
+      "status": "Scheduled",
+      "location": "Riverside"
+    }
+  ],
+  "inventory": [
+    {
+      "id": "inv_001",
+      "name": "Salmon treats",
+      "category": "Treats",
+      "sku": "TRT-SAL-001",
+      "stock": 8,
+      "reorderPoint": 20,
+      "unitPrice": 9.5
+    },
+    {
+      "id": "inv_002",
+      "name": "Leashes",
+      "category": "Accessories",
+      "sku": "ACC-LEA-001",
+      "stock": 5,
+      "reorderPoint": 15,
+      "unitPrice": 18
+    },
+    {
+      "id": "inv_003",
+      "name": "Dog shampoo",
+      "category": "Grooming",
+      "sku": "GRM-SHP-001",
+      "stock": 32,
+      "reorderPoint": 10,
+      "unitPrice": 14
+    }
+  ],
+  "sales": [
+    {
+      "id": "sale_001",
+      "date": "2026-09-03",
+      "category": "Treats",
+      "amount": 120
+    },
+    {
+      "id": "sale_002",
+      "date": "2026-09-03",
+      "category": "Accessories",
+      "amount": 95
+    },
+    {
+      "id": "sale_003",
+      "date": "2026-09-03",
+      "category": "Food",
+      "amount": 165
+    }
+  ],
+  "appointments": [
+    {
+      "id": "appt_001",
+      "jobId": "job_001",
+      "customerId": "customer_001",
+      "petId": "pet_001",
+      "date": "2026-09-03",
+      "startTime": "09:00",
+      "endTime": "09:30",
+      "status": "confirmed"
+    },
+    {
+      "id": "appt_002",
+      "jobId": "job_002",
+      "customerId": "customer_002",
+      "petId": "pet_002",
+      "date": "2026-09-03",
+      "startTime": "10:00",
+      "endTime": "11:30",
+      "status": "confirmed"
+    }
+  ],
+  "incidents": [
+    {
+      "id": "incident_001",
+      "type": "GPS",
+      "severity": "warning",
+      "title": "Jasper GPS ping issue",
+      "status": "open",
+      "createdAt": "2026-09-03T08:52:00"
+    }
+  ],
+  "bookingRequests": [
+    {
+      "id": "booking_001",
+      "customerName": "C. Wilson",
+      "petName": "Jasper",
+      "service": "Standard walk",
+      "requestedDate": "2026-09-03",
+      "requestedTime": "14:00",
+      "status": "awaiting_approval"
+    },
+    {
+      "id": "booking_002",
+      "customerName": "D. Lee",
+      "petName": "Duke",
+      "service": "Full groom",
+      "requestedDate": "2026-09-03",
+      "requestedTime": "15:00",
+      "status": "awaiting_approval"
+    },
+    {
+      "id": "booking_003",
+      "customerName": "K. Brown",
+      "petName": "Rocky",
+      "service": "Overnight boarding",
+      "requestedDate": "2026-09-04",
+      "requestedTime": "18:00",
+      "status": "awaiting_approval"
+    }
+  ],
+  "audit": []
+}

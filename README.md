@@ -1,6 +1,6 @@
-# Paw&Book Owner Console
+# Pawnets Owner Console
 
-Paw&Book is a React + Vite owner console backed by an Express API for running a Riverside pet-services branch. The app includes the dashboard cockpit, weekly calendar, jobs board, customer search, retail inventory, staff performance, service catalog, and reports.
+Pawnets is a React + Vite owner console backed by an Express API for running a Riverside pet-services branch. The app includes the dashboard cockpit, weekly calendar, jobs board, customer search, retail inventory, staff performance, service catalog, and reports.
 
 ## Run the website
 
@@ -55,4 +55,4 @@ pnpm --filter @workspace/api-spec run codegen
 - `lib/api-zod` — generated request and response validation schemas
 - `reference.html` — original uploaded Paw&Book prototype
 
-The API uses an in-memory demo dataset so the console is immediately usable after startup. Changes made in the current server session, such as completed attention items, job status updates, and draft purchase orders, are reflected in the UI for all connected browser sessions and reset when the API restarts.
+The API uses the fixture in `artifacts/api-server/data/db.json` as a small JSON-backed data store. Changes such as job status updates, staff/service edits, and draft purchase orders are persisted to that file and returned in the standard `{ success, data }` response envelope. The React client unwraps that envelope while retaining the existing console UI contract.
