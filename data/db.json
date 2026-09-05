@@ -55,6 +55,16 @@
       "provider": "email",
       "avatar": "AM",
       "createdAt": "2026-08-25T12:00:00.000Z"
+    },
+    {
+      "id": "user_bf123173",
+      "name": "Jordan Test",
+      "email": "jordan@pawandbook.com",
+      "role": "walker",
+      "password": "password123",
+      "provider": "email",
+      "avatar": "JT",
+      "createdAt": "2026-09-05T09:27:51.602Z"
     }
   ],
   "customers": [
@@ -363,5 +373,44 @@
       "status": "awaiting_approval"
     }
   ],
-  "audit": []
+  "audit": [
+    {
+      "id": "a9d51976-09a2-430b-a26c-f9e0c8ec5b5b",
+      "action": "auth.login",
+      "entity": "user",
+      "entityId": "user_owner_1",
+      "details": {
+        "email": "rina@example.com",
+        "role": "owner",
+        "provider": "email"
+      },
+      "actor": "user_owner_1",
+      "createdAt": "2026-09-05T09:24:12.891Z"
+    },
+    {
+      "id": "775aaa4a-68f5-46e9-b64b-755e591a3041",
+      "action": "auth.google_login",
+      "entity": "user",
+      "entityId": "user_google_1",
+      "details": {
+        "email": "alhamramzrn@gmail.com",
+        "provider": "google"
+      },
+      "actor": "user_owner_1",
+      "createdAt": "2026-09-05T09:24:12.908Z"
+    },
+    {
+      "id": "1cad9100-c6eb-4df7-82ac-50d74a7e46df",
+      "action": "auth.register",
+      "entity": "user",
+      "entityId": "user_bf123173",
+      "details": {
+        "email": "jordan@pawandbook.com",
+        "role": "walker",
+        "name": "Jordan Test"
+      },
+      "actor": "user_owner_1",
+      "createdAt": "2026-09-05T09:27:51.602Z"
+    }
+  ]
 }

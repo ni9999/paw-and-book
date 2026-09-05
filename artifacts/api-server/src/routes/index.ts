@@ -1,10 +1,12 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
 import pawAndBookRouter from "./paw-and-book";
 
 const router: IRouter = Router();
 
-router.use(healthRouter);
+router.get("/healthz", (_req, res) => {
+  res.json({ status: "healthy", time: new Date().toISOString() });
+});
+
 router.use(pawAndBookRouter);
 
 export default router;

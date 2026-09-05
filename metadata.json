@@ -1,0 +1,6 @@
+{
+  "name": "Paw & Book",
+  "description": "Owner console and operations manager for pet care branches, managing appointments, services, staff, customers, and inventory.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

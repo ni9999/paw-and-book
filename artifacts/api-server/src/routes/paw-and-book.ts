@@ -80,9 +80,20 @@ type Sale = {
   amount: number;
 };
 
+export type User = {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  password?: string;
+  provider?: string;
+  avatar?: string;
+  createdAt?: string;
+};
+
 type Database = {
   branch: Branch;
-  users: Array<{ id: string; name: string; role: string; email: string }>;
+  users: User[];
   customers: Customer[];
   staff: StaffMember[];
   services: Service[];
@@ -103,15 +114,22 @@ type Database = {
   }>;
 };
 
-const DB_FILE = path.resolve(process.cwd(), "data/db.json");
+function getDbFile(): string {
+  const primary = path.resolve(process.cwd(), "data/db.json");
+  if (fs.existsSync(primary)) return primary;
+  const secondary = path.resolve(process.cwd(), "artifacts/api-server/data/db.json");
+  if (fs.existsSync(secondary)) return secondary;
+  return primary;
+}
 
 function loadDb(): Database {
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf8")) as Database;
+  return JSON.parse(fs.readFileSync(getDbFile(), "utf8")) as Database;
 }
 
 function saveDb(db: Database): void {
-  fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-  fs.writeFileSync(DB_FILE, `${JSON.stringify(db, null, 2)}\n`, "utf8");
+  const dbFile = getDbFile();
+  fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+  fs.writeFileSync(dbFile, `${JSON.stringify(db, null, 2)}\n`, "utf8");
 }
 
 function ok<T>(res: Parameters<IRouter["get"]>[1] extends never ? never : any, data: T, status = 200) {
@@ -444,6 +462,147 @@ router.post("/retail/purchase-orders", (req, res) => {
   audit(db, "inventory.purchase_order_created", "inventory", item.id, purchaseOrder);
   saveDb(db);
   return ok(res, purchaseOrder, 201);
+});
+
+function sanitizeUser(user: User) {
+  const { password, ...rest } = user;
+  return rest;
+}
+
+// Authentication endpoints for testing and database assessment
+router.post("/auth/login", (req, res) => {
+  const db = loadDb();
+  const email = (req.body?.email || "").trim().toLowerCase();
+  const password = req.body?.password || "";
+
+  if (!email) {
+    return fail(res, "Email address is required");
+  }
+
+  const user = db.users.find((u) => u.email.toLowerCase() === email);
+  if (!user) {
+    return fail(res, "User not found in database. Use Quick Test accounts or register.", 401);
+  }
+
+  // In test mode: accept matching password or default test passwords
+  if (user.password && user.password !== password && password !== "password123" && password !== "admin" && password !== "test") {
+    return fail(res, "Invalid password. In testing mode, you can use 'password123'.", 401);
+  }
+
+  audit(db, "auth.login", "user", user.id, { email: user.email, role: user.role, provider: user.provider || "email" });
+  saveDb(db);
+
+  return ok(res, {
+    user: sanitizeUser(user),
+    token: `paw-token-${user.id}-${Date.now()}`,
+    message: "Login successful",
+  });
+});
+
+router.post("/auth/google", (req, res) => {
+  const db = loadDb();
+  const email = (req.body?.email || "alhamramzrn@gmail.com").trim().toLowerCase();
+  const name = (req.body?.name || (email === "alhamramzrn@gmail.com" ? "Alham Ramzrn" : email.split("@")[0])).trim();
+  const avatar = req.body?.avatar || name.split(" ").map((s: string) => s[0]).join("").slice(0, 2).toUpperCase();
+
+  let user = db.users.find((u) => u.email.toLowerCase() === email);
+  if (!user) {
+    user = {
+      id: `user_google_${randomUUID().slice(0, 8)}`,
+      name,
+      email,
+      role: "owner",
+      provider: "google",
+      avatar,
+      createdAt: new Date().toISOString(),
+    };
+    db.users.push(user);
+    audit(db, "auth.google_register", "user", user.id, { email, name });
+  } else {
+    audit(db, "auth.google_login", "user", user.id, { email, provider: "google" });
+  }
+  saveDb(db);
+
+  return ok(res, {
+    user: sanitizeUser(user),
+    token: `paw-token-google-${user.id}-${Date.now()}`,
+    message: "Signed in with Google successfully",
+  });
+});
+
+router.post("/auth/register", (req, res) => {
+  const db = loadDb();
+  const name = (req.body?.name || "").trim();
+  const email = (req.body?.email || "").trim().toLowerCase();
+  const password = req.body?.password || "password123";
+  const role = req.body?.role || "owner";
+
+  if (!name || !email) {
+    return fail(res, "Full name and email address are required");
+  }
+
+  const existing = db.users.find((u) => u.email.toLowerCase() === email);
+  if (existing) {
+    return fail(res, "A user with this email already exists in the database. Please sign in instead.", 409);
+  }
+
+  const initials = name
+    .split(" ")
+    .map((part: string) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "PB";
+
+  const newUser: User = {
+    id: `user_${randomUUID().slice(0, 8)}`,
+    name,
+    email,
+    role,
+    password,
+    provider: "email",
+    avatar: initials,
+    createdAt: new Date().toISOString(),
+  };
+
+  db.users.push(newUser);
+  audit(db, "auth.register", "user", newUser.id, { email, role, name });
+  saveDb(db);
+
+  return ok(res, {
+    user: sanitizeUser(newUser),
+    token: `paw-token-${newUser.id}-${Date.now()}`,
+    message: "User registered and stored in database successfully",
+  }, 201);
+});
+
+router.get("/auth/users", (_req, res) => {
+  const db = loadDb();
+  return ok(res, db.users.map(sanitizeUser));
+});
+
+router.get("/auth/me", (req, res) => {
+  const db = loadDb();
+  const authHeader = req.headers.authorization || "";
+  const emailHeader = (req.headers["x-user-email"] as string) || "";
+  
+  let user: User | undefined;
+  if (emailHeader) {
+    user = db.users.find((u) => u.email.toLowerCase() === emailHeader.toLowerCase());
+  } else if (authHeader.startsWith("Bearer paw-token-")) {
+    const raw = authHeader.replace("Bearer paw-token-", "").replace("google-", "");
+    const id = raw.split("-")[0];
+    user = db.users.find((u) => u.id === id || u.id === `user_${id}`);
+  }
+  
+  if (!user) {
+    user = db.users[0];
+  }
+
+  if (!user) {
+    return fail(res, "No users found in database", 404);
+  }
+
+  return ok(res, sanitizeUser(user));
 });
 
 export default router;
